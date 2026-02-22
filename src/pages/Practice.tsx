@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Send, SkipForward, CheckCircle, Loader2, Keyboard, Mic } from "lucide-react";
+import { Send, SkipForward, CheckCircle, Loader2, Keyboard, Mic, BookOpen, ListChecks } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import VoiceRecorder from "@/components/VoiceRecorder";
+import McqQuiz from "@/components/McqQuiz";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import toast from "react-hot-toast";
@@ -21,10 +22,12 @@ const Practice = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const sessionId = searchParams.get("session");
+  const [allQuestions, setAllQuestions] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answer, setAnswer] = useState("");
   const [answerMode, setAnswerMode] = useState<"type" | "voice">("type");
+  const [practiceMode, setPracticeMode] = useState<"answering" | "mcq">("answering");
   const [timerDuration, setTimerDuration] = useState(120);
   const [timeLeft, setTimeLeft] = useState(120);
   const [timerActive, setTimerActive] = useState(false);
@@ -34,11 +37,14 @@ const Practice = () => {
   useEffect(() => {
     if (!sessionId || !user) return;
     supabase.from("questions").select("*").eq("session_id", sessionId).eq("user_id", user.id)
-      .eq("is_practiced", false).order("created_at")
+      .order("created_at")
       .then(({ data }) => {
-        setQuestions(data || []);
+        const all = data || [];
+        setAllQuestions(all);
+        const openEnded = all.filter(q => (q.question_type || "open_ended") === "open_ended" && !q.is_practiced);
+        setQuestions(openEnded);
         setLoading(false);
-        if (data && data.length > 0 && timerDuration > 0) setTimerActive(true);
+        if (openEnded.length > 0 && timerDuration > 0) setTimerActive(true);
       });
   }, [sessionId, user]);
 
@@ -50,11 +56,45 @@ const Practice = () => {
 
   const current = questions[currentIdx];
 
+  const mcqQuestions = useMemo(() => {
+    return allQuestions.filter(q => q.question_type === "mcq").map(q => ({
+      id: q.id,
+      question_text: q.question_text,
+      options: q.options || {},
+      correct_answer: q.correct_answer || "A",
+      explanation: q.explanation || "",
+      difficulty: q.difficulty,
+      category: q.category,
+    }));
+  }, [allQuestions]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background"><Navbar />
         <div className="container mx-auto max-w-2xl px-4 pt-24 flex items-center justify-center">
           <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  if (practiceMode === "mcq") {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="container mx-auto max-w-2xl px-4 pt-24 pb-16">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-heading text-xl font-bold text-foreground">MCQ Practice</h2>
+            <Button variant="outline" onClick={() => setPracticeMode("answering")}
+              className="rounded-xl border-border/50 text-sm gap-2">
+              <BookOpen className="h-4 w-4" /> Switch to Answering
+            </Button>
+          </div>
+          {mcqQuestions.length > 0 ? (
+            <McqQuiz questions={mcqQuestions} sessionId={sessionId || ""} />
+          ) : (
+            <p className="text-center text-muted-foreground">No MCQs available for this session.</p>
+          )}
         </div>
       </div>
     );
@@ -67,9 +107,17 @@ const Practice = () => {
           <CheckCircle className="mx-auto h-16 w-16 text-primary mb-4" />
           <h2 className="font-heading text-2xl font-bold text-foreground">All questions practiced! 🎉</h2>
           <p className="mt-2 text-muted-foreground">You've completed all questions in this session.</p>
-          <Button onClick={() => navigate("/dashboard")} className="mt-6 glow-button rounded-xl px-8 py-6 text-primary-foreground">
-            Go to Dashboard
-          </Button>
+          <div className="mt-6 flex gap-3 justify-center">
+            <Button onClick={() => navigate("/dashboard")} className="glow-button rounded-xl px-8 py-6 text-primary-foreground">
+              Go to Dashboard
+            </Button>
+            {mcqQuestions.length > 0 && (
+              <Button variant="outline" onClick={() => setPracticeMode("mcq")}
+                className="rounded-xl border-border/50 px-8 py-6 gap-2">
+                <ListChecks className="h-4 w-4" /> Try MCQs
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -148,13 +196,21 @@ const Practice = () => {
 
           <div className="flex items-center justify-between mb-8">
             <span className="text-sm text-muted-foreground">Question {currentIdx + 1} of {questions.length}</span>
-            <div className="flex items-center gap-2">
-              {TIMER_OPTIONS.map((opt) => (
-                <button key={opt.label} onClick={() => selectTimer(opt.seconds)}
-                  className={`text-xs px-2 py-1 rounded-md transition-colors ${timerDuration === opt.seconds ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
-                  {opt.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-3">
+              {mcqQuestions.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setPracticeMode("mcq")}
+                  className="rounded-lg border-border/50 text-xs gap-1.5 h-7">
+                  <ListChecks className="h-3.5 w-3.5" /> MCQ Mode
+                </Button>
+              )}
+              <div className="flex items-center gap-1">
+                {TIMER_OPTIONS.map((opt) => (
+                  <button key={opt.label} onClick={() => selectTimer(opt.seconds)}
+                    className={`text-xs px-2 py-1 rounded-md transition-colors ${timerDuration === opt.seconds ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
