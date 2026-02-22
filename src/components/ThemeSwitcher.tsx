@@ -53,7 +53,62 @@ const THEMES = [
     ring: "340 80% 60%",
     preview: "#e11d48",
   },
+  {
+    name: "White",
+    primary: "220 13% 26%",
+    secondary: "220 13% 40%",
+    glowPrimary: "220 13% 26%",
+    glowSecondary: "220 13% 40%",
+    accent: "220 13% 26%",
+    ring: "220 13% 26%",
+    preview: "#ffffff",
+    // Light theme overrides
+    background: "0 0% 100%",
+    foreground: "220 13% 10%",
+    card: "0 0% 97%",
+    cardForeground: "220 13% 10%",
+    popover: "0 0% 97%",
+    popoverForeground: "220 13% 10%",
+    muted: "220 10% 93%",
+    mutedForeground: "220 10% 45%",
+    border: "220 10% 88%",
+    input: "220 10% 88%",
+    glassBg: "0 0% 95%",
+    glassBorder: "220 10% 85%",
+    sidebarBg: "0 0% 97%",
+    sidebarForeground: "220 13% 10%",
+    primaryForeground: "0 0% 100%",
+    secondaryForeground: "0 0% 100%",
+    accentForeground: "0 0% 100%",
+    sidebarAccent: "220 10% 93%",
+    sidebarAccentForeground: "220 13% 10%",
+    sidebarBorder: "220 10% 88%",
+  },
 ];
+
+// Default dark theme values to restore
+const DARK_DEFAULTS = {
+  background: "240 20% 3.5%",
+  foreground: "210 40% 96%",
+  card: "240 15% 6%",
+  cardForeground: "210 40% 96%",
+  popover: "240 15% 6%",
+  popoverForeground: "210 40% 96%",
+  muted: "240 10% 12%",
+  mutedForeground: "220 10% 55%",
+  border: "240 10% 14%",
+  input: "240 10% 14%",
+  glassBg: "240 15% 8%",
+  glassBorder: "240 10% 18%",
+  sidebarBg: "240 15% 5%",
+  sidebarForeground: "210 40% 96%",
+  primaryForeground: "240 20% 3.5%",
+  secondaryForeground: "240 20% 3.5%",
+  accentForeground: "240 20% 3.5%",
+  sidebarAccent: "240 10% 10%",
+  sidebarAccentForeground: "210 40% 96%",
+  sidebarBorder: "240 10% 14%",
+};
 
 const ThemeSwitcher = () => {
   const [open, setOpen] = useState(false);
@@ -83,10 +138,34 @@ const ThemeSwitcher = () => {
     root.style.setProperty("--glow-primary", theme.glowPrimary);
     root.style.setProperty("--glow-secondary", theme.glowSecondary);
     root.style.setProperty("--accent", theme.accent);
-    root.style.setProperty("--accent-foreground", "240 20% 3.5%");
     root.style.setProperty("--ring", theme.ring);
     root.style.setProperty("--sidebar-primary", theme.primary);
     root.style.setProperty("--sidebar-ring", theme.ring);
+
+    // Apply light/dark background overrides
+    const isLight = "background" in theme;
+    const vals = isLight ? theme : DARK_DEFAULTS;
+    root.style.setProperty("--background", (vals as any).background);
+    root.style.setProperty("--foreground", (vals as any).foreground);
+    root.style.setProperty("--card", (vals as any).card);
+    root.style.setProperty("--card-foreground", (vals as any).cardForeground);
+    root.style.setProperty("--popover", (vals as any).popover);
+    root.style.setProperty("--popover-foreground", (vals as any).popoverForeground);
+    root.style.setProperty("--muted", (vals as any).muted);
+    root.style.setProperty("--muted-foreground", (vals as any).mutedForeground);
+    root.style.setProperty("--border", (vals as any).border);
+    root.style.setProperty("--input", (vals as any).input);
+    root.style.setProperty("--glass-bg", (vals as any).glassBg);
+    root.style.setProperty("--glass-border", (vals as any).glassBorder);
+    root.style.setProperty("--sidebar-background", (vals as any).sidebarBg);
+    root.style.setProperty("--sidebar-foreground", (vals as any).sidebarForeground);
+    root.style.setProperty("--primary-foreground", (vals as any).primaryForeground);
+    root.style.setProperty("--secondary-foreground", (vals as any).secondaryForeground);
+    root.style.setProperty("--accent-foreground", (vals as any).accentForeground);
+    root.style.setProperty("--sidebar-accent", (vals as any).sidebarAccent);
+    root.style.setProperty("--sidebar-accent-foreground", (vals as any).sidebarAccentForeground);
+    root.style.setProperty("--sidebar-border", (vals as any).sidebarBorder);
+
     setActive(theme.name);
     localStorage.setItem("resumiq-theme", theme.name);
     setOpen(false);
@@ -121,7 +200,7 @@ const ThemeSwitcher = () => {
                     active === theme.name ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                 >
-                  <span className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: theme.preview }} />
+                  <span className="h-3 w-3 rounded-full flex-shrink-0 border border-border/50" style={{ backgroundColor: theme.preview }} />
                   {theme.name}
                 </button>
               ))}

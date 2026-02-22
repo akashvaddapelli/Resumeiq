@@ -21,14 +21,33 @@ The user has described their target job in natural language. It may be short, va
 STEP 2 - ATS SCORING:
 You are an ATS system. Read the ENTIRE resume text carefully — including all sections: summary, skills, frontend, backend, database, tools, projects, education. List every single technology and skill you find in the resume. Then compare them to the interpreted job description and give a match score from 0 to 100.
 
-STEP 3 - GENERATE QUESTIONS:
-Generate 3-5 interview questions per category requested. Vary difficulty levels (Easy, Medium, Hard).
+STEP 3 - GENERATE 40 OPEN-ENDED INTERVIEW QUESTIONS:
+Generate exactly 40 open-ended interview questions with this breakdown:
+- Behavioral (8 questions)
+- Technical (16 questions)
+- Situational (8 questions)
+- HR (8 questions)
+
+For open-ended questions — reference the candidate's actual projects, skills, and experience from their resume. Make every question specific and relevant, not generic. For example, instead of "What is React?" ask "Explain how you handled state management in your [specific project] using React.js".
+
+STEP 4 - GENERATE 20 MCQ QUESTIONS:
+Generate exactly 20 multiple-choice questions based strictly on the technologies listed in the candidate's resume.
+Each MCQ must have:
+- question: the question text
+- options: exactly 4 options labeled A, B, C, D
+- correct_answer: the letter of the correct option (A, B, C, or D)
+- explanation: one sentence explaining why the correct answer is right
+- difficulty: Easy (30%), Medium (50%), Hard (20%)
+- category: the technology/topic area
 
 Return a JSON object with this exact structure:
 {
   "interpreted_jd": "A 1-sentence interpreted job description",
-  "questions": [
+  "open_ended": [
     { "id": "q1", "category": "Technical", "question": "...", "difficulty": "Easy|Medium|Hard" }
+  ],
+  "mcq": [
+    { "id": "m1", "category": "React", "question": "...", "options": {"A": "...", "B": "...", "C": "...", "D": "..."}, "correct_answer": "B", "explanation": "...", "difficulty": "Easy|Medium|Hard" }
   ],
   "atsScore": {
     "score": 0-100,
@@ -38,6 +57,7 @@ Return a JSON object with this exact structure:
   }
 }
 
+IMPORTANT: You MUST generate exactly 40 open-ended questions and exactly 20 MCQs. Never less.
 IMPORTANT for ATS: You MUST identify ALL skills in the resume including backend skills like Node.js, Express.js, MongoDB, MySQL, RESTful APIs, TypeScript, Python, Java — not just frontend skills.`;
 
     const userPrompt = `Job Description (raw user input): ${jobDescription}
@@ -46,7 +66,7 @@ Experience Level: ${experience || "Not specified"}
 Interview Types: ${interviewTypes?.join(", ") || "Technical, Behavioral"}
 Company: ${company || "Not specified"}
 
-Interpret the JD, score the resume, and generate questions. Return ONLY valid JSON.`;
+Generate 40 open-ended interview questions AND 20 MCQs for this candidate. For open-ended questions — reference the candidate's actual projects, skills, and experience. Make every question specific and relevant, not generic. For MCQs — create questions based strictly on the technologies listed in their resume. Each MCQ must have 4 options, one correct answer marked, and a one-sentence explanation. Return ONLY valid JSON.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -55,7 +75,7 @@ Interpret the JD, score the resume, and generate questions. Return ONLY valid JS
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -83,6 +103,11 @@ Interpret the JD, score the resume, and generate questions. Return ONLY valid JS
     let content = aiData.choices?.[0]?.message?.content || "";
     content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     const parsed = JSON.parse(content);
+
+    // Backward compat: also expose as "questions" for Setup.tsx
+    if (parsed.open_ended && !parsed.questions) {
+      parsed.questions = parsed.open_ended;
+    }
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
