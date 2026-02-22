@@ -240,7 +240,10 @@ const Questions = () => {
         {activeTopTab === "interview" && (
           <div className="fixed bottom-0 left-0 right-0 border-t border-border/50 bg-background/80 backdrop-blur-xl p-4 z-50">
             <div className="container mx-auto max-w-3xl">
-              <Button onClick={() => navigate(`/practice?session=${sessionId}`)}
+              <Button onClick={() => {
+                  const skillsParam = selectedSkills.length > 0 ? `&skills=${encodeURIComponent(selectedSkills.join(","))}` : "";
+                  navigate(`/practice?session=${sessionId}${skillsParam}`);
+                }}
                 className="w-full glow-button rounded-xl py-6 text-base font-semibold text-primary-foreground">
                 <Play className="mr-2 h-4 w-4" /> Start Practice Mode
               </Button>

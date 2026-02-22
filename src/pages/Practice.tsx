@@ -22,12 +22,15 @@ const Practice = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const sessionId = searchParams.get("session");
+  const skillsParam = searchParams.get("skills");
+  const initialSkills = useMemo(() => skillsParam ? skillsParam.split(",") : [], [skillsParam]);
   const [allQuestions, setAllQuestions] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answer, setAnswer] = useState("");
   const [answerMode, setAnswerMode] = useState<"type" | "voice">("type");
   const [practiceMode, setPracticeMode] = useState<"answering" | "mcq">("answering");
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(initialSkills);
   const [timerDuration, setTimerDuration] = useState(120);
   const [timeLeft, setTimeLeft] = useState(120);
   const [timerActive, setTimerActive] = useState(false);
@@ -39,14 +42,25 @@ const Practice = () => {
     supabase.from("questions").select("*").eq("session_id", sessionId).eq("user_id", user.id)
       .order("created_at")
       .then(({ data }) => {
-        const all = data || [];
-        setAllQuestions(all);
-        const openEnded = all.filter(q => (q.question_type || "open_ended") === "open_ended" && !q.is_practiced);
-        setQuestions(openEnded);
+        setAllQuestions(data || []);
         setLoading(false);
-        if (openEnded.length > 0 && timerDuration > 0) setTimerActive(true);
       });
   }, [sessionId, user]);
+
+  // Filter open-ended questions based on selected skills
+  useEffect(() => {
+    let openEnded = allQuestions.filter(q => (q.question_type || "open_ended") === "open_ended" && !q.is_practiced);
+    if (selectedSkills.length > 0) {
+      openEnded = openEnded.filter(q => selectedSkills.includes(q.category));
+    }
+    setQuestions(openEnded);
+    setCurrentIdx(0);
+    setAnswer("");
+    if (openEnded.length > 0 && timerDuration > 0) {
+      setTimeLeft(timerDuration);
+      setTimerActive(true);
+    }
+  }, [allQuestions, selectedSkills]);
 
   useEffect(() => {
     if (!timerActive || timeLeft <= 0 || timerDuration === 0) return;
@@ -57,7 +71,11 @@ const Practice = () => {
   const current = questions[currentIdx];
 
   const mcqQuestions = useMemo(() => {
-    return allQuestions.filter(q => q.question_type === "mcq").map(q => ({
+    let mcqs = allQuestions.filter(q => q.question_type === "mcq");
+    if (selectedSkills.length > 0) {
+      mcqs = mcqs.filter(q => selectedSkills.includes(q.category));
+    }
+    return mcqs.map(q => ({
       id: q.id,
       question_text: q.question_text,
       options: q.options || {},
@@ -66,7 +84,17 @@ const Practice = () => {
       difficulty: q.difficulty,
       category: q.category,
     }));
+  }, [allQuestions, selectedSkills]);
+
+  const allSkills = useMemo(() => {
+    const cats = new Set<string>();
+    allQuestions.forEach(q => { if (q.category) cats.add(q.category); });
+    return Array.from(cats).sort();
   }, [allQuestions]);
+
+  const toggleSkill = (skill: string) => {
+    setSelectedSkills(prev => prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]);
+  };
 
   if (loading) {
     return (
@@ -77,6 +105,31 @@ const Practice = () => {
       </div>
     );
   }
+
+  const SkillChips = () => (
+    allSkills.length > 1 ? (
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filter by skill</span>
+          {selectedSkills.length > 0 && (
+            <button onClick={() => setSelectedSkills([])} className="text-xs text-primary hover:underline ml-auto">Clear</button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {allSkills.map(skill => (
+            <button key={skill} onClick={() => toggleSkill(skill)}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                selectedSkills.includes(skill)
+                  ? "bg-primary/10 text-primary border-primary/30"
+                  : "bg-muted/50 text-muted-foreground border-border hover:text-foreground hover:border-primary/30"
+              }`}>
+              {skill}
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : null
+  );
 
   if (practiceMode === "mcq") {
     return (
@@ -90,10 +143,11 @@ const Practice = () => {
               <BookOpen className="h-4 w-4" /> Switch to Answering
             </Button>
           </div>
+          <SkillChips />
           {mcqQuestions.length > 0 ? (
             <McqQuiz questions={mcqQuestions} sessionId={sessionId || ""} />
           ) : (
-            <p className="text-center text-muted-foreground">No MCQs available for this session.</p>
+            <p className="text-center text-muted-foreground">No MCQs available for the selected skills.</p>
           )}
         </div>
       </div>
@@ -189,9 +243,9 @@ const Practice = () => {
       <Navbar />
       <div className="container mx-auto max-w-2xl px-4 pt-24 pb-16">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <SkillChips />
           {/* Progress bar */}
           <div className="w-full bg-muted rounded-full h-1.5 mb-6">
-            <div className="bg-primary h-1.5 rounded-full transition-all duration-300" style={{ width: `${progressPct}%` }} />
           </div>
 
           <div className="flex items-center justify-between mb-8">
