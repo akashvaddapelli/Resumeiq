@@ -12,6 +12,7 @@ import Questions from "./pages/Questions";
 import Practice from "./pages/Practice";
 import Feedback from "./pages/Feedback";
 import Dashboard from "./pages/Dashboard";
+import History from "./pages/History";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
           <Route path="/practice" element={<Practice />} />
           <Route path="/feedback" element={<Feedback />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/history" element={<History />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
