@@ -59,18 +59,12 @@ const Questions = () => {
     return Array.from(cats).sort();
   }, [questions]);
 
-  const toggleSkill = (skill: string) => {
-    setSelectedSkills(prev =>
-      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
-    );
-  };
-
-  const generateForSkills = async () => {
-    if (selectedSkills.length === 0) { toast.error("Select at least one skill"); return; }
+  const generateForSkills = async (skills: string[]) => {
+    if (skills.length === 0) return;
     setGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-questions", {
-        body: { focusedSkills: selectedSkills, resumeText: session?.resume_text || "" },
+        body: { focusedSkills: skills, resumeText: session?.resume_text || "" },
       });
       if (error) throw error;
 
@@ -103,12 +97,29 @@ const Questions = () => {
         const { data: inserted, error: insertErr } = await supabase.from("questions").insert(newQuestions).select();
         if (insertErr) throw insertErr;
         setQuestions(prev => [...prev, ...(inserted || [])]);
-        toast.success(`Generated ${newQuestions.length} new questions for ${selectedSkills.join(", ")}!`);
+        toast.success(`Generated ${newQuestions.length} questions for ${skills.join(", ")}!`);
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to generate questions");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  // Track which skills we've already generated for
+  const [generatedSkills, setGeneratedSkills] = useState<Set<string>>(new Set());
+
+  const toggleSkill = (skill: string) => {
+    const isAdding = !selectedSkills.includes(skill);
+    const newSkills = isAdding
+      ? [...selectedSkills, skill]
+      : selectedSkills.filter(s => s !== skill);
+    setSelectedSkills(newSkills);
+
+    // Auto-generate for newly added skills that haven't been generated yet
+    if (isAdding && !generatedSkills.has(skill)) {
+      setGeneratedSkills(prev => new Set([...prev, skill]));
+      generateForSkills([skill]);
     }
   };
 
@@ -226,12 +237,11 @@ const Questions = () => {
                 {skill}
               </button>
             ))}
-            {selectedSkills.length > 0 && (
-              <Button onClick={generateForSkills} disabled={generating} size="sm"
-                className="glow-button rounded-full text-xs gap-1.5 text-primary-foreground h-7 px-3">
-                {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                {generating ? "Generating..." : `Generate 20+ for ${selectedSkills.join(", ")}`}
-              </Button>
+            {generating && (
+              <span className="flex items-center gap-1.5 text-xs text-primary">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Generating...
+              </span>
             )}
           </div>
         </div>
