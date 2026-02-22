@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import toast from "react-hot-toast";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -44,6 +45,7 @@ const Navbar = () => {
               <a href="#how-it-works" className="text-sm text-muted-foreground transition-colors hover:text-foreground">How it Works</a>
             </div>
             <div className="hidden items-center gap-3 md:flex">
+              <ThemeSwitcher />
               <Link to="/auth">
                 <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">Log in</Button>
               </Link>
@@ -57,6 +59,7 @@ const Navbar = () => {
           </>
         ) : (
           <div className="flex items-center gap-3">
+            <ThemeSwitcher />
             <Link to="/dashboard">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">Dashboard</Button>
             </Link>

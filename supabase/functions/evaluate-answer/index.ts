@@ -9,18 +9,22 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { question, answer, category } = await req.json();
+    const { question, answer, category, isVoice } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are an expert interview coach. The user answered an interview question. Evaluate their answer on: clarity, relevance, confidence, and completeness.
+    const voiceExtra = isVoice
+      ? `\nAlso evaluate communication clarity since this was a spoken answer transcribed to text. Note filler phrases, repetition, or lack of structure. Include a "clarity_note" field with one sentence about their communication clarity (e.g. "Your answer was clear and well structured" or "Try to be more concise — your answer had filler phrases"). Factor communication clarity into the confidence_score.`
+      : "";
+
+    const systemPrompt = `You are an expert interview coach. The user answered an interview question. Evaluate their answer on: clarity, relevance, confidence, and completeness.${voiceExtra}
 
 Return a JSON object with this exact structure:
 {
   "confidence_score": 0-100,
   "feedback": "2-3 sentences of constructive feedback",
   "sample_answer": "A strong model answer for this question",
-  "weak_areas": ["area1", "area2"]
+  "weak_areas": ["area1", "area2"]${isVoice ? ',\n  "clarity_note": "one sentence about communication clarity"' : ""}
 }
 
 Be constructive and specific. The confidence score should reflect how well the answer would perform in a real interview.`;
@@ -28,7 +32,7 @@ Be constructive and specific. The confidence score should reflect how well the a
     const userPrompt = `Category: ${category}
 Question: ${question}
 Candidate's Answer: ${answer}
-
+${isVoice ? "Note: This answer was spoken aloud and transcribed." : ""}
 Evaluate this answer. Return ONLY valid JSON.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
