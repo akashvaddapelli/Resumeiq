@@ -35,7 +35,7 @@ const Navbar = () => {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg glow-button">
             <Zap className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="font-heading text-xl font-bold text-foreground">Resumiq</span>
+          <span className="font-heading text-xl font-bold text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]">Resumiq</span>
         </Link>
 
         {isLanding ? (
