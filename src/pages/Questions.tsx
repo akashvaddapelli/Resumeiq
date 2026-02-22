@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, Play, Loader2, Download } from "lucide-react";
+import { CheckCircle, Play, Loader2, Download, Filter } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import McqQuiz from "@/components/McqQuiz";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +31,7 @@ const Questions = () => {
   const [activeTab, setActiveTab] = useState("All");
   const [loading, setLoading] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
 
   useEffect(() => {
     if (!sessionId || !user) return;
@@ -48,6 +49,21 @@ const Questions = () => {
     });
   }, [sessionId, user]);
 
+  // Extract unique skills/categories from all questions
+  const allSkills = useMemo(() => {
+    const cats = new Set<string>();
+    questions.forEach(q => {
+      if (q.category) cats.add(q.category);
+    });
+    return Array.from(cats).sort();
+  }, [questions]);
+
+  const toggleSkill = (skill: string) => {
+    setSelectedSkills(prev =>
+      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
+    );
+  };
+
   const togglePracticed = async (id: string, current: boolean) => {
     const { error } = await supabase.from("questions").update({ is_practiced: !current }).eq("id", id);
     if (error) { toast.error("Failed to update"); return; }
@@ -57,7 +73,16 @@ const Questions = () => {
   const openEndedQs = questions.filter(q => (q.question_type || "open_ended") === "open_ended");
   const mcqQs = questions.filter(q => q.question_type === "mcq");
 
-  const categories = ["All", ...new Set(openEndedQs.map(q => q.category))];
+  // Filter by selected skills
+  const filteredOpenEnded = selectedSkills.length === 0
+    ? openEndedQs
+    : openEndedQs.filter(q => selectedSkills.includes(q.category));
+
+  const filteredMcqs = selectedSkills.length === 0
+    ? mcqQs
+    : mcqQs.filter(q => selectedSkills.includes(q.category));
+
+  const categories = ["All", ...new Set(filteredOpenEnded.map(q => q.category))];
 
   const handleDownloadPdf = async () => {
     if (!session) return;
@@ -69,7 +94,6 @@ const Questions = () => {
         return { ...q, answer: ans || undefined };
       });
 
-      // Fetch MCQ results
       const { data: mcqRes } = await supabase.from("mcq_results" as any).select("*").eq("session_id", sessionId).eq("user_id", user!.id).order("created_at", { ascending: false }).limit(1);
       const mcqResult = (mcqRes as any)?.[0];
 
@@ -115,7 +139,7 @@ const Questions = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="container mx-auto max-w-3xl px-4 pt-24 pb-24">
+      <div className={`container mx-auto max-w-3xl px-4 pt-24 ${activeTopTab === "interview" ? "pb-28" : "pb-8"}`}>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center justify-between">
             <div>
@@ -129,14 +153,42 @@ const Questions = () => {
           </div>
         </motion.div>
 
+        {/* Skill filter chips */}
+        <div className="mt-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filter by skill</span>
+            {selectedSkills.length > 0 && (
+              <button onClick={() => setSelectedSkills([])} className="text-xs text-primary hover:underline ml-auto">
+                Clear all
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {allSkills.map(skill => (
+              <button
+                key={skill}
+                onClick={() => toggleSkill(skill)}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                  selectedSkills.includes(skill)
+                    ? "bg-primary/10 text-primary border-primary/30"
+                    : "bg-muted/50 text-muted-foreground border-border hover:text-foreground hover:border-primary/30"
+                }`}
+              >
+                {skill}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Top-level tabs */}
         <Tabs value={activeTopTab} onValueChange={setActiveTopTab} className="mt-6">
           <TabsList className="bg-muted/50 border border-border rounded-xl p-1 w-full">
             <TabsTrigger value="interview" className="flex-1 rounded-lg text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
-              Interview Questions ({openEndedQs.length})
+              Interview Questions ({filteredOpenEnded.length})
             </TabsTrigger>
             <TabsTrigger value="mcq" className="flex-1 rounded-lg text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
-              MCQ Quiz ({mcqQs.length})
+              MCQ Quiz ({filteredMcqs.length})
             </TabsTrigger>
           </TabsList>
 
@@ -150,7 +202,7 @@ const Questions = () => {
 
               {categories.map(c => (
                 <TabsContent key={c} value={c} className="mt-6 space-y-3">
-                  {(c === "All" ? openEndedQs : openEndedQs.filter(q => q.category === c)).map((q, i) => (
+                  {(c === "All" ? filteredOpenEnded : filteredOpenEnded.filter(q => q.category === c)).map((q, i) => (
                     <motion.div key={q.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.05 }}
                       className={`glass-card-hover flex items-start gap-4 p-5 ${q.is_practiced ? "opacity-70" : ""}`}>
@@ -172,7 +224,7 @@ const Questions = () => {
           </TabsContent>
 
           <TabsContent value="mcq" className="mt-6">
-            <McqQuiz questions={mcqQs.map(q => ({
+            <McqQuiz questions={filteredMcqs.map(q => ({
               id: q.id,
               question_text: q.question_text,
               options: q.options || {},
@@ -184,14 +236,17 @@ const Questions = () => {
           </TabsContent>
         </Tabs>
 
-        <div className="fixed bottom-0 left-0 right-0 border-t border-border/50 bg-background/80 backdrop-blur-xl p-4">
-          <div className="container mx-auto max-w-3xl">
-            <Button onClick={() => navigate(`/practice?session=${sessionId}`)}
-              className="w-full glow-button rounded-xl py-6 text-base font-semibold text-primary-foreground">
-              <Play className="mr-2 h-4 w-4" /> Start Practice Mode
-            </Button>
+        {/* Only show practice button on interview tab */}
+        {activeTopTab === "interview" && (
+          <div className="fixed bottom-0 left-0 right-0 border-t border-border/50 bg-background/80 backdrop-blur-xl p-4 z-50">
+            <div className="container mx-auto max-w-3xl">
+              <Button onClick={() => navigate(`/practice?session=${sessionId}`)}
+                className="w-full glow-button rounded-xl py-6 text-base font-semibold text-primary-foreground">
+                <Play className="mr-2 h-4 w-4" /> Start Practice Mode
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
