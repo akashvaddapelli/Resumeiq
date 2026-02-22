@@ -13,30 +13,46 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Decode base64 audio
-    const binaryStr = atob(audio);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-
-    const ext = mimeType?.includes("webm") ? "webm" : "mp4";
-    const formData = new FormData();
-    formData.append("file", new Blob([bytes], { type: mimeType || "audio/webm" }), `audio.${ext}`);
-    formData.append("model", "whisper-1");
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
+    // Use Gemini Flash with inline audio data for transcription
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}` },
-      body: formData,
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_audio",
+                input_audio: {
+                  data: audio,
+                  format: mimeType?.includes("webm") ? "webm" : "mp4",
+                },
+              },
+              {
+                type: "text",
+                text: "Transcribe this audio recording exactly as spoken. Return ONLY the transcribed text, nothing else. No quotes, no labels, no formatting — just the raw spoken words.",
+              },
+            ],
+          },
+        ],
+      }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("Whisper API error:", response.status, errText);
+      console.error("Transcription API error:", response.status, errText);
       throw new Error(`Transcription failed: ${response.status}`);
     }
 
     const data = await response.json();
-    return new Response(JSON.stringify({ text: data.text }), {
+    const text = data.choices?.[0]?.message?.content?.trim() || "";
+
+    return new Response(JSON.stringify({ text }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
