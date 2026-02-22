@@ -107,7 +107,8 @@ const Questions = () => {
   };
 
   // Track which skills we've already generated for
-  const [generatedSkills, setGeneratedSkills] = useState<Set<string>>(new Set());
+  const [generatedKey, setGeneratedKey] = useState<string>("");
+  const generateTimeoutRef = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const toggleSkill = (skill: string) => {
     const isAdding = !selectedSkills.includes(skill);
@@ -116,10 +117,14 @@ const Questions = () => {
       : selectedSkills.filter(s => s !== skill);
     setSelectedSkills(newSkills);
 
-    // Auto-generate for newly added skills that haven't been generated yet
-    if (isAdding && !generatedSkills.has(skill)) {
-      setGeneratedSkills(prev => new Set([...prev, skill]));
-      generateForSkills([skill]);
+    // Debounce: wait 800ms after last selection, then generate for all selected skills combined
+    if (generateTimeoutRef[0]) clearTimeout(generateTimeoutRef[0]);
+    const key = [...newSkills].sort().join(",");
+    if (newSkills.length > 0 && key !== generatedKey) {
+      generateTimeoutRef[0] = setTimeout(() => {
+        setGeneratedKey(key);
+        generateForSkills(newSkills);
+      }, 800);
     }
   };
 
