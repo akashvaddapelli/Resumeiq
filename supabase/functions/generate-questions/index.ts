@@ -13,36 +13,40 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are an expert interview preparation assistant. Your job is to:
-1. Interpret the user's job description input, no matter how informal, broken, or vague it is. Extract the role, experience level, tech stack, and domain.
-2. Use the resume content (if provided) to fill gaps.
-3. Generate personalized interview questions.
+    const systemPrompt = `You are an expert interview preparation assistant and ATS scoring system.
 
-IMPORTANT: Never ask the user to rephrase. Always produce useful, relevant questions regardless of input quality.
+STEP 1 - INTERPRET THE JOB DESCRIPTION:
+The user has described their target job in natural language. It may be short, vague, or contain typos. Interpret their intent and extract: job role, required skills, experience level, and domain. Use the resume content to fill in any missing gaps. Respond as if you received a complete formal job description. Never ask the user to retype. Always produce output.
+
+STEP 2 - ATS SCORING:
+You are an ATS system. Read the ENTIRE resume text carefully — including all sections: summary, skills, frontend, backend, database, tools, projects, education. List every single technology and skill you find in the resume. Then compare them to the interpreted job description and give a match score from 0 to 100.
+
+STEP 3 - GENERATE QUESTIONS:
+Generate 3-5 interview questions per category requested. Vary difficulty levels (Easy, Medium, Hard).
 
 Return a JSON object with this exact structure:
 {
+  "interpreted_jd": "A 1-sentence interpreted job description",
   "questions": [
-    { "id": "q1", "category": "Technical", "question": "...", "difficulty": "Easy|Medium|Hard" },
-    ...
+    { "id": "q1", "category": "Technical", "question": "...", "difficulty": "Easy|Medium|Hard" }
   ],
   "atsScore": {
     "score": 0-100,
-    "matchedKeywords": ["keyword1", ...],
-    "missingKeywords": ["keyword1", ...],
-    "summary": "Brief summary of resume-JD match"
+    "skills_found": ["every", "skill", "found", "in", "resume"],
+    "skills_missing": ["skills", "in", "JD", "not", "in", "resume"],
+    "recommendation": "2-3 sentences of advice"
   }
 }
 
-Generate 3-5 questions per category requested. Vary difficulty levels.`;
+IMPORTANT for ATS: You MUST identify ALL skills in the resume including backend skills like Node.js, Express.js, MongoDB, MySQL, RESTful APIs, TypeScript, Python, Java — not just frontend skills.`;
 
-    const userPrompt = `Job Description: ${jobDescription}
-Resume: ${resumeText || "Not provided"}
+    const userPrompt = `Job Description (raw user input): ${jobDescription}
+Full Resume Text: ${resumeText || "Not provided"}
 Experience Level: ${experience || "Not specified"}
 Interview Types: ${interviewTypes?.join(", ") || "Technical, Behavioral"}
 Company: ${company || "Not specified"}
 
-Generate interview questions and ATS score. Return ONLY valid JSON.`;
+Interpret the JD, score the resume, and generate questions. Return ONLY valid JSON.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -77,10 +81,7 @@ Generate interview questions and ATS score. Return ONLY valid JSON.`;
 
     const aiData = await response.json();
     let content = aiData.choices?.[0]?.message?.content || "";
-    
-    // Strip markdown code fences if present
     content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    
     const parsed = JSON.parse(content);
 
     return new Response(JSON.stringify(parsed), {

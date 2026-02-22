@@ -13,14 +13,14 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are an expert interview coach. Evaluate the candidate's answer and provide feedback.
+    const systemPrompt = `You are an expert interview coach. The user answered an interview question. Evaluate their answer on: clarity, relevance, confidence, and completeness.
 
 Return a JSON object with this exact structure:
 {
-  "confidenceScore": 0-100,
-  "sampleAnswer": "A strong sample answer for this question",
-  "weakAreas": ["area1", "area2"],
-  "tips": ["tip1", "tip2"]
+  "confidence_score": 0-100,
+  "feedback": "2-3 sentences of constructive feedback",
+  "sample_answer": "A strong model answer for this question",
+  "weak_areas": ["area1", "area2"]
 }
 
 Be constructive and specific. The confidence score should reflect how well the answer would perform in a real interview.`;

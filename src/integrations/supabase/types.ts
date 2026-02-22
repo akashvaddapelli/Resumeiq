@@ -14,7 +14,184 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      answers: {
+        Row: {
+          answer_text: string
+          confidence_score: number | null
+          created_at: string
+          feedback_text: string | null
+          id: string
+          question_id: string
+          sample_answer: string | null
+          user_id: string
+          weak_areas: string[] | null
+        }
+        Insert: {
+          answer_text: string
+          confidence_score?: number | null
+          created_at?: string
+          feedback_text?: string | null
+          id?: string
+          question_id: string
+          sample_answer?: string | null
+          user_id: string
+          weak_areas?: string[] | null
+        }
+        Update: {
+          answer_text?: string
+          confidence_score?: number | null
+          created_at?: string
+          feedback_text?: string | null
+          id?: string
+          question_id?: string
+          sample_answer?: string | null
+          user_id?: string
+          weak_areas?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      questions: {
+        Row: {
+          category: string
+          created_at: string
+          difficulty: string
+          id: string
+          is_practiced: boolean
+          question_text: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          difficulty?: string
+          id?: string
+          is_practiced?: boolean
+          question_text: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          difficulty?: string
+          id?: string
+          is_practiced?: boolean
+          question_text?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sessions: {
+        Row: {
+          ats_feedback: Json | null
+          ats_score: number | null
+          company_name: string | null
+          created_at: string
+          experience_level: string | null
+          id: string
+          interview_type: string[] | null
+          job_description_interpreted: string | null
+          job_description_raw: string | null
+          resume_text: string | null
+          user_id: string
+        }
+        Insert: {
+          ats_feedback?: Json | null
+          ats_score?: number | null
+          company_name?: string | null
+          created_at?: string
+          experience_level?: string | null
+          id?: string
+          interview_type?: string[] | null
+          job_description_interpreted?: string | null
+          job_description_raw?: string | null
+          resume_text?: string | null
+          user_id: string
+        }
+        Update: {
+          ats_feedback?: Json | null
+          ats_score?: number | null
+          company_name?: string | null
+          created_at?: string
+          experience_level?: string | null
+          id?: string
+          interview_type?: string[] | null
+          job_description_interpreted?: string | null
+          job_description_raw?: string | null
+          resume_text?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      streaks: {
+        Row: {
+          current_streak: number
+          id: string
+          last_active_date: string | null
+          longest_streak: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          current_streak?: number
+          id?: string
+          last_active_date?: string | null
+          longest_streak?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          current_streak?: number
+          id?: string
+          last_active_date?: string | null
+          longest_streak?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

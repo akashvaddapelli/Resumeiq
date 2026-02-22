@@ -1,13 +1,27 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Zap, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Zap, Menu, X, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import toast from "react-hot-toast";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const isLanding = location.pathname === "/";
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Logged out");
+    navigate("/");
+  };
 
   return (
     <motion.nav
@@ -20,7 +34,7 @@ const Navbar = () => {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg glow-button">
             <Zap className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="font-heading text-xl font-bold text-foreground">Intervu</span>
+          <span className="font-heading text-xl font-bold text-foreground">Resumiq</span>
         </Link>
 
         {isLanding ? (
@@ -46,9 +60,17 @@ const Navbar = () => {
             <Link to="/dashboard">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">Dashboard</Button>
             </Link>
+            <Link to="/history">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">History</Button>
+            </Link>
             <Link to="/setup">
               <Button size="sm" className="glow-button rounded-lg px-5 text-sm font-semibold text-primary-foreground">New Session</Button>
             </Link>
+            {user && (
+              <Button variant="ghost" size="icon" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         )}
       </div>
