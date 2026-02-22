@@ -16,7 +16,9 @@ serve(async (req) => {
     // Skill-focused generation mode
     if (focusedSkills && focusedSkills.length > 0) {
       const skillList = focusedSkills.join(", ");
-      const skillPrompt = `You are an expert interview preparation assistant. Generate exactly 20 open-ended interview questions AND 20 MCQ questions focused ONLY on these specific skills/technologies: ${skillList}.
+      const skillPrompt = `You are an expert interview preparation assistant. Generate exactly 20 open-ended interview questions AND 20 MCQ questions that collectively cover ALL of these skills/technologies: ${skillList}.
+
+IMPORTANT: The total must be exactly 20 open-ended and 20 MCQs regardless of how many skills are listed. Distribute questions evenly across all the listed skills so each skill gets fair coverage.
 
 For open-ended questions:
 - Make them deep, specific, and practical — not generic definitions
@@ -35,9 +37,9 @@ Return ONLY valid JSON:
   "mcq": [{ "id": "m1", "category": "SkillName", "question": "...", "options": {"A":"..","B":"..","C":"..","D":".."}, "correct_answer": "B", "explanation": "...", "difficulty": "Easy|Medium|Hard" }]
 }`;
 
-      const userMsg = `Skills to focus on: ${skillList}
+      const userMsg = `Skills to cover (distribute questions evenly across ALL): ${skillList}
 ${resumeText ? `Resume: ${resumeText}` : ""}
-Generate exactly 20 open-ended and 20 MCQ questions. Return ONLY valid JSON.`;
+Generate exactly 20 open-ended and 20 MCQ questions total covering all skills. Return ONLY valid JSON.`;
 
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
