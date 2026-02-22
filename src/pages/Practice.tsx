@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Send, SkipForward, CheckCircle, Loader2 } from "lucide-react";
+import { Send, SkipForward, CheckCircle, Loader2, Keyboard, Mic } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import VoiceRecorder from "@/components/VoiceRecorder";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import toast from "react-hot-toast";
@@ -23,6 +24,7 @@ const Practice = () => {
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answer, setAnswer] = useState("");
+  const [answerMode, setAnswerMode] = useState<"type" | "voice">("type");
   const [timerDuration, setTimerDuration] = useState(120);
   const [timeLeft, setTimeLeft] = useState(120);
   const [timerActive, setTimerActive] = useState(false);
@@ -36,22 +38,26 @@ const Practice = () => {
       .then(({ data }) => {
         setQuestions(data || []);
         setLoading(false);
-        if (data && data.length > 0 && timerDuration > 0) {
-          setTimerActive(true);
-        }
+        if (data && data.length > 0 && timerDuration > 0) setTimerActive(true);
       });
   }, [sessionId, user]);
 
   useEffect(() => {
     if (!timerActive || timeLeft <= 0 || timerDuration === 0) return;
-    const interval = setInterval(() => setTimeLeft(t => t - 1), 1000);
+    const interval = setInterval(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearInterval(interval);
   }, [timerActive, timeLeft, timerDuration]);
 
   const current = questions[currentIdx];
 
   if (loading) {
-    return <div className="min-h-screen bg-background"><Navbar /><div className="container mx-auto max-w-2xl px-4 pt-24 flex items-center justify-center"><Loader2 className="h-8 w-8 text-primary animate-spin" /></div></div>;
+    return (
+      <div className="min-h-screen bg-background"><Navbar />
+        <div className="container mx-auto max-w-2xl px-4 pt-24 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        </div>
+      </div>
+    );
   }
 
   if (!current || questions.length === 0) {
@@ -72,19 +78,19 @@ const Practice = () => {
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
   const timerPct = timerDuration > 0 ? (timeLeft / timerDuration) * 100 : 100;
-  const progressPct = ((currentIdx) / questions.length) * 100;
+  const progressPct = (currentIdx / questions.length) * 100;
 
   const handleSubmit = async () => {
-    if (!answer.trim()) { toast.error("Please write your answer"); return; }
+    if (!answer.trim()) { toast.error("Please provide your answer"); return; }
     setSubmitting(true);
 
     try {
+      const isVoice = answerMode === "voice";
       const { data, error } = await supabase.functions.invoke("evaluate-answer", {
-        body: { question: current.question_text, answer, category: current.category },
+        body: { question: current.question_text, answer, category: current.category, isVoice },
       });
       if (error) throw error;
 
-      // Save answer to DB
       await supabase.from("answers").insert({
         question_id: current.id,
         user_id: user!.id,
@@ -95,10 +101,8 @@ const Practice = () => {
         weak_areas: data.weak_areas || [],
       });
 
-      // Mark question as practiced
       await supabase.from("questions").update({ is_practiced: true }).eq("id", current.id);
 
-      // Navigate to feedback
       sessionStorage.setItem("resumiq_feedback", JSON.stringify({
         ...data,
         question: current.question_text,
@@ -118,7 +122,7 @@ const Practice = () => {
   const skipQuestion = async () => {
     await supabase.from("questions").update({ is_practiced: true }).eq("id", current.id);
     if (currentIdx + 1 < questions.length) {
-      setCurrentIdx(i => i + 1);
+      setCurrentIdx((i) => i + 1);
       setAnswer("");
       setTimeLeft(timerDuration);
     } else {
@@ -145,7 +149,7 @@ const Practice = () => {
           <div className="flex items-center justify-between mb-8">
             <span className="text-sm text-muted-foreground">Question {currentIdx + 1} of {questions.length}</span>
             <div className="flex items-center gap-2">
-              {TIMER_OPTIONS.map(opt => (
+              {TIMER_OPTIONS.map((opt) => (
                 <button key={opt.label} onClick={() => selectTimer(opt.seconds)}
                   className={`text-xs px-2 py-1 rounded-md transition-colors ${timerDuration === opt.seconds ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
                   {opt.label}
@@ -180,16 +184,51 @@ const Practice = () => {
             <h2 className="mt-4 font-heading text-xl font-semibold text-foreground leading-relaxed">{current.question_text}</h2>
           </div>
 
-          {/* Answer */}
-          <div className="mt-6 input-glow">
-            <textarea value={answer} onChange={(e) => setAnswer(e.target.value)}
-              placeholder="Type your answer here..." rows={8}
-              className="w-full bg-transparent p-4 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none resize-none" />
+          {/* Answer Mode Tabs */}
+          <div className="mt-6 mb-4">
+            <div className="flex bg-muted rounded-lg p-1 relative">
+              <motion.div
+                className="absolute inset-y-1 rounded-md bg-card border border-border/50"
+                animate={{ x: answerMode === "type" ? 0 : "100%", width: "50%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                style={{ width: "calc(50% - 4px)", left: 2 }}
+              />
+              <button
+                onClick={() => { setAnswerMode("type"); setAnswer(""); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md z-10 transition-colors ${answerMode === "type" ? "text-foreground" : "text-muted-foreground"}`}
+              >
+                <Keyboard className="h-4 w-4" /> Type Answer
+              </button>
+              <button
+                onClick={() => { setAnswerMode("voice"); setAnswer(""); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md z-10 transition-colors ${answerMode === "voice" ? "text-foreground" : "text-muted-foreground"}`}
+              >
+                <Mic className="h-4 w-4" /> Speak Answer
+              </button>
+            </div>
           </div>
-          <p className="mt-1 text-right text-xs text-muted-foreground">{answer.split(/\s+/).filter(Boolean).length} words</p>
+
+          {/* Type Mode */}
+          {answerMode === "type" && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="type">
+              <div className="input-glow">
+                <textarea value={answer} onChange={(e) => setAnswer(e.target.value)}
+                  placeholder="Type your answer here..." rows={8}
+                  className="w-full bg-transparent p-4 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none resize-none" />
+              </div>
+              <p className="mt-1 text-right text-xs text-muted-foreground">{answer.split(/\s+/).filter(Boolean).length} words</p>
+            </motion.div>
+          )}
+
+          {/* Voice Mode */}
+          {answerMode === "voice" && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="voice">
+              <VoiceRecorder onTranscription={(text) => setAnswer(text)} disabled={submitting} />
+            </motion.div>
+          )}
 
           <div className="mt-6 flex gap-3">
-            <Button onClick={handleSubmit} disabled={submitting}
+            <Button onClick={handleSubmit} disabled={submitting || !answer.trim()}
               className="flex-1 glow-button rounded-xl py-6 text-base font-semibold text-primary-foreground">
               {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Evaluating...</> : <><Send className="mr-2 h-4 w-4" /> Submit Answer</>}
             </Button>
