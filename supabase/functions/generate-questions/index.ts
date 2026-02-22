@@ -9,10 +9,65 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { jobDescription, resumeText, experience, interviewTypes, company } = await req.json();
+    const { jobDescription, resumeText, experience, interviewTypes, company, focusedSkills } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
+    // Skill-focused generation mode
+    if (focusedSkills && focusedSkills.length > 0) {
+      const skillList = focusedSkills.join(", ");
+      const skillPrompt = `You are an expert interview preparation assistant. Generate exactly 20 open-ended interview questions AND 20 MCQ questions focused ONLY on these specific skills/technologies: ${skillList}.
+
+For open-ended questions:
+- Make them deep, specific, and practical — not generic definitions
+- Mix difficulty: 30% Easy, 50% Medium, 20% Hard
+- Categories should match the skill names provided
+${resumeText ? `- Reference the candidate's actual projects and experience from their resume when possible` : ""}
+
+For MCQ questions:
+- Each must have: question, 4 options (A-D), correct_answer (letter), explanation (1 sentence), difficulty, category
+- Difficulty split: 30% Easy, 50% Medium, 20% Hard
+- Categories should match the skill names provided
+
+Return ONLY valid JSON:
+{
+  "open_ended": [{ "id": "q1", "category": "SkillName", "question": "...", "difficulty": "Easy|Medium|Hard" }],
+  "mcq": [{ "id": "m1", "category": "SkillName", "question": "...", "options": {"A":"..","B":"..","C":"..","D":".."}, "correct_answer": "B", "explanation": "...", "difficulty": "Easy|Medium|Hard" }]
+}`;
+
+      const userMsg = `Skills to focus on: ${skillList}
+${resumeText ? `Resume: ${resumeText}` : ""}
+Generate exactly 20 open-ended and 20 MCQ questions. Return ONLY valid JSON.`;
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: skillPrompt },
+            { role: "user", content: userMsg },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (response.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        throw new Error("AI gateway error");
+      }
+
+      const aiData = await response.json();
+      let content = aiData.choices?.[0]?.message?.content || "";
+      content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const parsed = JSON.parse(content);
+      return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Original full generation mode
     const systemPrompt = `You are an expert interview preparation assistant and ATS scoring system.
 
 STEP 1 - INTERPRET THE JOB DESCRIPTION:

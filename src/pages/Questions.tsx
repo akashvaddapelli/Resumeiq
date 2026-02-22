@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, Play, Loader2, Download, Filter } from "lucide-react";
+import { CheckCircle, Play, Loader2, Download, Filter, Sparkles } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import McqQuiz from "@/components/McqQuiz";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +32,7 @@ const Questions = () => {
   const [loading, setLoading] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     if (!sessionId || !user) return;
@@ -62,6 +63,53 @@ const Questions = () => {
     setSelectedSkills(prev =>
       prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
     );
+  };
+
+  const generateForSkills = async () => {
+    if (selectedSkills.length === 0) { toast.error("Select at least one skill"); return; }
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-questions", {
+        body: { focusedSkills: selectedSkills, resumeText: session?.resume_text || "" },
+      });
+      if (error) throw error;
+
+      const newQuestions: any[] = [];
+      for (const q of (data.open_ended || [])) {
+        newQuestions.push({
+          session_id: sessionId,
+          user_id: user!.id,
+          question_text: q.question,
+          category: q.category,
+          difficulty: q.difficulty || "Medium",
+          question_type: "open_ended",
+        });
+      }
+      for (const q of (data.mcq || [])) {
+        newQuestions.push({
+          session_id: sessionId,
+          user_id: user!.id,
+          question_text: q.question,
+          category: q.category,
+          difficulty: q.difficulty || "Medium",
+          question_type: "mcq",
+          options: q.options,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation,
+        });
+      }
+
+      if (newQuestions.length > 0) {
+        const { data: inserted, error: insertErr } = await supabase.from("questions").insert(newQuestions).select();
+        if (insertErr) throw insertErr;
+        setQuestions(prev => [...prev, ...(inserted || [])]);
+        toast.success(`Generated ${newQuestions.length} new questions for ${selectedSkills.join(", ")}!`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate questions");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const togglePracticed = async (id: string, current: boolean) => {
@@ -178,6 +226,13 @@ const Questions = () => {
                 {skill}
               </button>
             ))}
+            {selectedSkills.length > 0 && (
+              <Button onClick={generateForSkills} disabled={generating} size="sm"
+                className="glow-button rounded-full text-xs gap-1.5 text-primary-foreground h-7 px-3">
+                {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                {generating ? "Generating..." : `Generate 20+ for ${selectedSkills.join(", ")}`}
+              </Button>
+            )}
           </div>
         </div>
 
