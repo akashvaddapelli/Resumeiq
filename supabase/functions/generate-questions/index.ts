@@ -1,17 +1,47 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const MAX_JD_LENGTH = 10000;
+const MAX_RESUME_LENGTH = 50000;
+const MAX_SKILLS = 20;
+const MAX_SKILL_LENGTH = 100;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+    const { data, error: authError } = await supabaseClient.auth.getClaims(authHeader.replace("Bearer ", ""));
+    if (authError || !data?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { jobDescription, resumeText, experience, interviewTypes, company, focusedSkills } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    // Input validation
+    if (jobDescription && (typeof jobDescription !== "string" || jobDescription.length > MAX_JD_LENGTH)) {
+      return new Response(JSON.stringify({ error: "Job description too long or invalid (max 10000 chars)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (resumeText && (typeof resumeText !== "string" || resumeText.length > MAX_RESUME_LENGTH)) {
+      return new Response(JSON.stringify({ error: "Resume too large (max 50000 chars)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (focusedSkills) {
+      if (!Array.isArray(focusedSkills) || focusedSkills.length > MAX_SKILLS || focusedSkills.some((s: unknown) => typeof s !== "string" || s.length > MAX_SKILL_LENGTH)) {
+        return new Response(JSON.stringify({ error: "Invalid skills input" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
 
     // Skill-focused generation mode
     if (focusedSkills && focusedSkills.length > 0) {
@@ -70,6 +100,10 @@ Generate exactly 20 open-ended and 20 MCQ questions total covering all skills. R
     }
 
     // Original full generation mode
+    if (!jobDescription || typeof jobDescription !== "string" || jobDescription.trim().length === 0) {
+      return new Response(JSON.stringify({ error: "Job description is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const systemPrompt = `You are an expert interview preparation assistant and ATS scoring system.
 
 STEP 1 - INTERPRET THE JOB DESCRIPTION:
@@ -152,7 +186,7 @@ Generate 40 open-ended interview questions AND 20 MCQs for this candidate. For o
         });
       }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error("AI gateway error:", response.status);
       throw new Error("AI gateway error");
     }
 
@@ -170,8 +204,8 @@ Generate 40 open-ended interview questions AND 20 MCQs for this candidate. For o
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("generate-questions error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+    console.error("generate-questions error:", e instanceof Error ? e.message : "Unknown error");
+    return new Response(JSON.stringify({ error: "An error occurred processing your request" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

@@ -1,17 +1,44 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const MAX_QUESTION_LENGTH = 2000;
+const MAX_ANSWER_LENGTH = 5000;
+const MAX_CATEGORY_LENGTH = 200;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+    const { data, error: authError } = await supabaseClient.auth.getClaims(authHeader.replace("Bearer ", ""));
+    if (authError || !data?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { question, answer, category, isVoice } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    // Input validation
+    if (!question || typeof question !== "string" || question.length > MAX_QUESTION_LENGTH) {
+      return new Response(JSON.stringify({ error: "Invalid question (max 2000 chars)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (!answer || typeof answer !== "string" || answer.length > MAX_ANSWER_LENGTH) {
+      return new Response(JSON.stringify({ error: "Invalid answer (max 5000 chars)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (category && (typeof category !== "string" || category.length > MAX_CATEGORY_LENGTH)) {
+      return new Response(JSON.stringify({ error: "Invalid category" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const voiceExtra = isVoice
       ? `\nAlso evaluate communication clarity since this was a spoken answer transcribed to text. Note filler phrases, repetition, or lack of structure. Include a "clarity_note" field with one sentence about their communication clarity (e.g. "Your answer was clear and well structured" or "Try to be more concise — your answer had filler phrases"). Factor communication clarity into the confidence_score.`
@@ -73,8 +100,8 @@ Evaluate this answer. Return ONLY valid JSON.`;
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("evaluate-answer error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+    console.error("evaluate-answer error:", e instanceof Error ? e.message : "Unknown error");
+    return new Response(JSON.stringify({ error: "An error occurred processing your request" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
