@@ -1,0 +1,7 @@
+project_id = "aurkexnxokpoarkzugzr"
+
+[functions.generate-questions]
+verify_jwt = false
+
+[functions.evaluate-answer]
+verify_jwt = false
