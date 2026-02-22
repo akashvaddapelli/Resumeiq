@@ -58,6 +58,39 @@ export type Database = {
           },
         ]
       }
+      mcq_results: {
+        Row: {
+          correct_answers: number
+          created_at: string
+          id: string
+          score_percentage: number
+          session_id: string
+          total_questions: number
+          user_id: string
+          weakest_topic: string | null
+        }
+        Insert: {
+          correct_answers?: number
+          created_at?: string
+          id?: string
+          score_percentage?: number
+          session_id: string
+          total_questions?: number
+          user_id: string
+          weakest_topic?: string | null
+        }
+        Update: {
+          correct_answers?: number
+          created_at?: string
+          id?: string
+          score_percentage?: number
+          session_id?: string
+          total_questions?: number
+          user_id?: string
+          weakest_topic?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -85,31 +118,43 @@ export type Database = {
       questions: {
         Row: {
           category: string
+          correct_answer: string | null
           created_at: string
           difficulty: string
+          explanation: string | null
           id: string
           is_practiced: boolean
+          options: Json | null
           question_text: string
+          question_type: string
           session_id: string
           user_id: string
         }
         Insert: {
           category: string
+          correct_answer?: string | null
           created_at?: string
           difficulty?: string
+          explanation?: string | null
           id?: string
           is_practiced?: boolean
+          options?: Json | null
           question_text: string
+          question_type?: string
           session_id: string
           user_id: string
         }
         Update: {
           category?: string
+          correct_answer?: string | null
           created_at?: string
           difficulty?: string
+          explanation?: string | null
           id?: string
           is_practiced?: boolean
+          options?: Json | null
           question_text?: string
+          question_type?: string
           session_id?: string
           user_id?: string
         }

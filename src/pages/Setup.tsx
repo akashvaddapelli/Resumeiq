@@ -128,17 +128,32 @@ const Setup = () => {
 
       if (sessionErr) throw sessionErr;
 
-      // Save questions to DB
-      const questionsToInsert = (data.questions || []).map((q: any) => ({
+      // Save open-ended questions to DB
+      const openEndedQs = (data.open_ended || data.questions || []).map((q: any) => ({
         session_id: session.id,
         user_id: user.id,
         category: q.category,
         question_text: q.question,
         difficulty: q.difficulty || "Medium",
+        question_type: "open_ended",
       }));
 
-      if (questionsToInsert.length > 0) {
-        const { error: qErr } = await supabase.from("questions").insert(questionsToInsert);
+      // Save MCQ questions to DB
+      const mcqQs = (data.mcq || []).map((q: any) => ({
+        session_id: session.id,
+        user_id: user.id,
+        category: q.category,
+        question_text: q.question,
+        difficulty: q.difficulty || "Medium",
+        question_type: "mcq",
+        options: q.options,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+      }));
+
+      const allQuestions = [...openEndedQs, ...mcqQs];
+      if (allQuestions.length > 0) {
+        const { error: qErr } = await supabase.from("questions").insert(allQuestions);
         if (qErr) throw qErr;
       }
 
