@@ -178,17 +178,42 @@ export const generateSessionPdf = (data: SessionData) => {
     }
 
     mcqs.forEach((q, i) => {
-      checkPage(20);
+      checkPage(35);
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
       const qLines = doc.splitTextToSize(`${i + 1}. ${q.question_text}`, contentWidth);
       doc.text(qLines, margin, y);
-      y += qLines.length * 5 + 2;
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(0, 120, 80);
-      doc.text(`Correct: ${(q as any).correct_answer || "N/A"}`, margin + 5, y);
+      y += qLines.length * 5 + 3;
+
+      const options = (q as any).options as Record<string, string> | undefined;
+      const correctAnswer = (q as any).correct_answer as string | undefined;
+      const optionKeys = ["A", "B", "C", "D"];
+
+      if (options) {
+        optionKeys.forEach(letter => {
+          const optionText = options[letter];
+          if (!optionText) return;
+          checkPage(8);
+          const isCorrect = letter === correctAnswer;
+          if (isCorrect) {
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 120, 80);
+            const line = doc.splitTextToSize(`★ ${letter}) ${optionText}`, contentWidth - 10);
+            doc.text(line, margin + 5, y);
+            y += line.length * 5 + 1;
+          } else {
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(80, 80, 80);
+            const line = doc.splitTextToSize(`   ${letter}) ${optionText}`, contentWidth - 10);
+            doc.text(line, margin + 5, y);
+            y += line.length * 5 + 1;
+          }
+        });
+      }
+
       doc.setTextColor(0, 0, 0);
-      y += 6;
+      y += 4;
     });
   }
 
