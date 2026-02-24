@@ -198,7 +198,7 @@ export const generateSessionPdf = (data: SessionData) => {
           const isCorrect = letter === correctAnswer;
           doc.setFont("helvetica", isCorrect ? "bold" : "normal");
           doc.setTextColor(80, 80, 80);
-          const prefix = isCorrect ? `★ ${letter})` : `   ${letter})`;
+          const prefix = `${letter})`;
           const line = doc.splitTextToSize(`${prefix} ${optionText}`, contentWidth - 10);
           doc.text(line, margin + 5, y);
           y += line.length * 5 + 1;
