@@ -196,19 +196,12 @@ export const generateSessionPdf = (data: SessionData) => {
           if (!optionText) return;
           checkPage(8);
           const isCorrect = letter === correctAnswer;
-          if (isCorrect) {
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(0, 120, 80);
-            const line = doc.splitTextToSize(`★ ${letter}) ${optionText}`, contentWidth - 10);
-            doc.text(line, margin + 5, y);
-            y += line.length * 5 + 1;
-          } else {
-            doc.setFont("helvetica", "normal");
-            doc.setTextColor(80, 80, 80);
-            const line = doc.splitTextToSize(`   ${letter}) ${optionText}`, contentWidth - 10);
-            doc.text(line, margin + 5, y);
-            y += line.length * 5 + 1;
-          }
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(80, 80, 80);
+          const prefix = isCorrect ? `★ ${letter})` : `   ${letter})`;
+          const line = doc.splitTextToSize(`${prefix} ${optionText}`, contentWidth - 10);
+          doc.text(line, margin + 5, y);
+          y += line.length * 5 + 1;
         });
       }
 
