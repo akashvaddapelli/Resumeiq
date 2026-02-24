@@ -11,6 +11,21 @@ const MAX_RESUME_LENGTH = 50000;
 const MAX_SKILLS = 20;
 const MAX_SKILL_LENGTH = 100;
 
+function cleanAndParseJSON(raw: string): any {
+  let content = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  // Fix common AI JSON issues: trailing commas, single quotes, control chars
+  content = content.replace(/,\s*([}\]])/g, "$1");
+  content = content.replace(/[\x00-\x1F\x7F]/g, (ch) => ch === '\n' || ch === '\t' ? ch : '');
+  try {
+    return JSON.parse(content);
+  } catch {
+    // Try to extract JSON object from surrounding text
+    const match = content.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error("Failed to parse AI response as JSON");
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -93,9 +108,8 @@ Generate exactly 20 open-ended and 20 MCQ questions total covering all skills. R
       }
 
       const aiData = await response.json();
-      let content = aiData.choices?.[0]?.message?.content || "";
-      content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      const parsed = JSON.parse(content);
+      const content = aiData.choices?.[0]?.message?.content || "";
+      const parsed = cleanAndParseJSON(content);
       return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -191,9 +205,8 @@ Generate 40 open-ended interview questions AND 20 MCQs for this candidate. For o
     }
 
     const aiData = await response.json();
-    let content = aiData.choices?.[0]?.message?.content || "";
-    content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const parsed = JSON.parse(content);
+    const content = aiData.choices?.[0]?.message?.content || "";
+    const parsed = cleanAndParseJSON(content);
 
     // Backward compat: also expose as "questions" for Setup.tsx
     if (parsed.open_ended && !parsed.questions) {
